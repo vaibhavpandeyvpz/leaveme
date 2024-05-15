@@ -4,21 +4,33 @@ on:
   push:
     tags: ["*"]
 
+permissions:
+  contents: write
+
 jobs:
-  release:
-    name: Releasing for ${{ matrix.os }}
+  create-release:
     runs-on: ubuntu-latest
+    steps:
+      - name: Create a Github release
+        uses: taiki-e/create-gh-release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    name: Release ${{ matrix.target }}
+    needs: create-release
+    runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
-          - os: windows
+          - os: windows-latest
             target: x86_64-pc-windows-gnu
             archive: zip
-          - os: linux
+          - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             archive: tar.gz
-          - os: macOS
+          - os: macos-latest
             target: x86_64-apple-darwin
             archive: zip
     steps:
@@ -28,7 +40,7 @@ jobs:
       - name: Compile and release
         uses: rust-build/rust-build.action@v1.4.5
         env:
-          GITHUB_TOKEN: ${{ secrets.RUSTBUILD_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           ARCHIVE_TYPES: ${{ matrix.archive }}
           RUSTTARGET: ${{ matrix.target }}
