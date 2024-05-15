@@ -10,8 +10,8 @@ env:
 
 permissions:
   contents: write
-  packages: write
   id-token: write
+  packages: write
 
 jobs:
   create-release:
