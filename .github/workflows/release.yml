@@ -54,7 +54,7 @@ jobs:
 
   container:
     name: Build Docker image
-    needs: release
+    needs: create-release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
