@@ -2,28 +2,28 @@
 
 <p align="center">
 Headless employee leave management in <a href="https://www.rust-lang.org/">Rust</a> built on <a href="https://slack.com/intl/en-in/">Slack</a> for small businesses.
-Record leave requests, require manager approval and leave(s) history etc. provided as slack workflows.
+Record leave requests, require manager approval and leave(s) history etc. provided as Slack slash command(s).
 </p>
 
 ## Usage
 
-Go to [api.slack.com](https://api.slack.com/), create a new app using provided manifest (see [slack.dist.yml](slack.dist.yml)) and install it on a [Slack](https://slack.com/intl/en-in/) workspace.
-Once done, make note of **signing secret** as well as **bot access token** as you will need them later.
-
 Grab a binary from the latest release for your platform from [this page](https://github.com/vaibhavpandeyvpz/leaveme/releases/latest).
-In the same folder as binary, create a `.env` file from the sample in the repository using below command:
+In the same folder as binary, create a `config.yml` file from the sample in the repository using below command:
 
 ```shell
-wget -O .env https://raw.githubusercontent.com/vaibhavpandeyvpz/leaveme/main/.env.dist
+wget -O config.yml https://raw.githubusercontent.com/vaibhavpandeyvpz/leaveme/main/config.dist.yml
 ```
 
-Update your [Slack](https://slack.com/intl/en-in/) credentials in `.env` file and start the app server using below command:
+Then go to [api.slack.com](https://api.slack.com/), create a new app using provided manifest (see [slack.dist.yml](slack.dist.yml)) and install it on a [Slack](https://slack.com/intl/en-in/) workspace.
+Once done, make note of the **signing secret** as well as **bot access token** shown in [Slack](https://slack.com/intl/en-in/).
+
+Update your [Slack](https://slack.com/intl/en-in/) credentials in `config.yml` file and start the app server using below command:
 
 ```shell
-./leaveme
+./leaveme --config=config.yml
 ```
 
-Since [Slack](https://slack.com/intl/en-in/) needs to communicate to your app for certain functionality, it's recommended to run this on a server and install an [SSL](https://letsencrypt.org/) certificate.
+Since [Slack](https://slack.com/intl/en-in/) needs to communicate with your app for certain functionality, it's recommended to run this on a server and install an [SSL](https://letsencrypt.org/) certificate.
 
 ## Development
 
@@ -36,7 +36,12 @@ Download or clone the project using [Git](https://git-scm.com/) and then run fol
 # create .env file in project
 cp .env.dist .env
 
-# update values e.g., NGROK_AUTHTOKEN in .env
+# update NGROK_AUTHTOKEN in .env
+
+# create app config file
+cp config.dist.yml config.yml
+
+# update values in config.yml
 
 # create ngrok config file
 cp ngrok.dist.yml ngrok.yml

@@ -1,0 +1,12 @@
+database:
+  path: leaves.sqlite
+
+managers:
+  - USER_ID_1
+  - USER_ID_2
+
+slack:
+  bot_token:
+  channels:
+    leaves:
+  signing_secret:
