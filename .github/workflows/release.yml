@@ -39,9 +39,8 @@ jobs:
         with:
           fetch-depth: 0
       - name: Compile and release
-        uses: rust-build/rust-build.action@v1.4.5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: taiki-e/upload-rust-binary-action@v1
         with:
-          ARCHIVE_TYPES: ${{ matrix.archive }}
-          RUSTTARGET: ${{ matrix.target }}
+          bin: leaveme
+          target: ${{ matrix.target }}
+          token: ${{ secrets.GITHUB_TOKEN }}
