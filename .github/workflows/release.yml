@@ -4,8 +4,14 @@ on:
   push:
     tags: ["*"]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 permissions:
   contents: write
+  packages: write
+  id-token: write
 
 jobs:
   create-release:
@@ -15,6 +21,7 @@ jobs:
       - name: Create a Github release
         uses: taiki-e/create-gh-release-action@v1
         with:
+          draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
   release:
@@ -44,3 +51,42 @@ jobs:
           bin: leaveme
           target: ${{ matrix.target }}
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  container:
+    name: Build Docker image
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.1.1
+        with:
+          cosign-release: v2.1.1
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@v2.9.1
+      - name: Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@v2.2.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v4.6.0
+        with:
+          images: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          tags: |
+            type=raw,value=${{ steps.release.outputs.version }}
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@v4.1.1
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: 'true'
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max=
