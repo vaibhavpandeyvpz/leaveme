@@ -16,10 +16,13 @@ permissions:
 jobs:
   create-release:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - name: Create a Github release
         uses: taiki-e/create-gh-release-action@v1
+        id: release
         with:
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -78,7 +81,7 @@ jobs:
         with:
           images: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
           tags: |
-            type=raw,value=${{ steps.release.outputs.version }}
+            type=raw,value=${{ needs.create-release.outputs.version }}
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@v4.1.1
