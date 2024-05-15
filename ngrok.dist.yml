@@ -1,0 +1,11 @@
+version: 2
+
+region: eu
+
+tunnels:
+  web:
+    proto: http
+    addr: app:8000
+    # domain: <custom domain name, if paid account>
+    schemes:
+      - https

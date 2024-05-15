@@ -1,0 +1,23 @@
+display_information:
+  name: Leave Me
+  description: Manage employee leave(s) effortlessly.
+  background_color: "#d20962"
+features:
+  bot_user:
+    display_name: Leave Me
+    always_online: true
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - im:write
+      - users:read
+      - reactions:write
+settings:
+  interactivity:
+    is_enabled: true
+    request_url: https://<ngrok_host_name>/slack/interaction
+    message_menu_options_url: https://<ngrok_host_name>/slack/options
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

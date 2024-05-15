@@ -1,0 +1,23 @@
+version: "3"
+
+services:
+  app:
+    build: .
+    command: cargo watch -x run
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+
+  ngrok:
+    command: start --all --config /etc/ngrok.yml
+    env_file:
+      - .env
+    image: ngrok/ngrok
+    ports:
+      - "4040:4040"
+    restart: unless-stopped
+    volumes:
+      - ./ngrok.yml:/etc/ngrok.yml
