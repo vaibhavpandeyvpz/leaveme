@@ -11,6 +11,7 @@ jobs:
   create-release:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Create a Github release
         uses: taiki-e/create-gh-release-action@v1
         with:
