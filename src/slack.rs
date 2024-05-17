@@ -1,4 +1,5 @@
 use crate::config;
+use crate::routes::InteractionStateValues;
 use slack_morphism::prelude::*;
 
 lazy_static::lazy_static! {
@@ -42,15 +43,16 @@ pub(crate) async fn send_leave_request(
     until: &String,
     reason: Option<&String>,
 ) -> String {
+    let reason_str = match reason.is_some() {
+        true => reason.unwrap().into(),
+        false => "No reason provided.".to_string(),
+    };
     let blocks: Vec<SlackBlock> = slack_blocks![
         some_into(SlackSectionBlock::new().with_text(md!(format!(
             "<@{}> has submitted a leave request from `{}` to `{}`.",
             user, from, until
         )))),
-        some_into(SlackSectionBlock::new().with_text(md!(format!(
-            "*Reason:* {}",
-            reason.or(Some(&"No reason provided.".to_string())).unwrap()
-        )))),
+        some_into(SlackSectionBlock::new().with_text(md!(format!("*Reason:* {}", reason_str)))),
         some_into(SlackActionsBlock::new(slack_blocks![
             some_into(
                 SlackBlockButtonElement::new("approve_leave_request".into(), pt!("Approve"),)
@@ -177,4 +179,96 @@ pub(crate) async fn send_text_message(
 
         Some(post_chat_resp.ts.to_string())
     };
+}
+
+pub(crate) async fn submit_leave_request(
+    from_channel: &String,
+    to_channel: &String,
+    user: &String,
+    values: &InteractionStateValues,
+) {
+    let from = &values["leave_request_from"]["leave_request_from_input"]["selected_date"];
+    let until = &values["leave_request_until"]["leave_request_until_input"]["selected_date"];
+    let reason = &values["leave_request_reason"]["leave_request_reason_input"]["value"];
+    let reason_as_str = match reason.is_some() {
+        true => Some(reason.as_ref().unwrap()),
+        false => None,
+    };
+
+    // send leave request
+    let ts = send_leave_request(
+        to_channel,
+        user,
+        from.as_ref().unwrap(),
+        until.as_ref().unwrap(),
+        reason_as_str,
+    )
+    .await;
+
+    // notify managers
+    let permalink = get_message_link(&config::<String>("slack.channels.leaves"), &ts).await;
+    let managers = config::<Vec<String>>("managers");
+    for manager in managers.iter() {
+        send_text_message(
+            manager.into(),
+            &format!(
+                "<@{}> has submitted a leave request. Please <{}|click here> to approve/reject.",
+                user, permalink
+            )
+            .to_string(),
+            None,
+            None,
+        )
+        .await;
+    }
+
+    // notify requester
+    let _ = send_text_message(
+        from_channel,
+        &"Your request for leave has been submitted for approval.".to_string(),
+        None,
+        Some(user),
+    );
+}
+
+pub(crate) async fn update_leave_request(
+    channel: &String,
+    user: &String,
+    from: &String,
+    until: &String,
+    manager: &String,
+    approved: bool,
+    ts: &String,
+) {
+    // add reaction
+    add_reaction(
+        channel,
+        ts,
+        &match approved {
+            true => "white_check_mark",
+            false => "x",
+        }
+        .to_string(),
+    )
+    .await;
+
+    // add reply
+    let action = match approved {
+        true => "approved",
+        false => "rejected",
+    };
+    send_text_message(
+        channel,
+        &format!("<@{}> has *{}* this leave request.", manager, action).to_string(),
+        Some(ts),
+        None,
+    )
+    .await;
+
+    // notify requester
+    let message = format!(
+        "Your leave request from `{}` to `{}` has been *{}* :smile: by <@{}>.",
+        from, until, action, manager
+    );
+    send_text_message(user, &message, None, None).await;
 }
