@@ -1,11 +1,16 @@
 display_information:
-  name: Leave Me
+  name: Leave me
   description: Manage employee leave(s) effortlessly.
   background_color: "#d20962"
 features:
   bot_user:
-    display_name: Leave Me
+    display_name: Leave me
     always_online: true
+  slash_commands:
+    - command: /leave-me
+      url: https://<ngrok_host_name>/slack/command
+      description: Submit a leave request.
+      should_escape: false
 oauth_config:
   scopes:
     bot:

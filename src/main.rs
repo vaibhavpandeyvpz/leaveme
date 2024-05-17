@@ -1,3 +1,6 @@
+mod routes;
+mod slack;
+
 #[macro_use]
 extern crate rocket;
 
@@ -32,12 +35,14 @@ pub fn config<'a, T: serde::Deserialize<'a>>(key: &str) -> T {
     CONFIG.get::<T>(key).unwrap()
 }
 
-#[get("/")]
-fn index() -> &'static str {
-    "Leave me please."
-}
-
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![index])
+    rocket::build().mount(
+        "/",
+        routes![
+            routes::index,
+            routes::slack_command,
+            routes::slack_interaction,
+        ],
+    )
 }
