@@ -51,7 +51,7 @@ pub(crate) async fn send_leave_request(
                 SlackBlockButtonElement::new("approve_leave_request".into(), pt!("Approve"),)
                     .with_confirm(SlackBlockConfirmItem::new(
                         pt!("Really?"),
-                        pt!("This will mark the leave as approved. It cannot be undone."),
+                        pt!("This will mark this request for leave as approved. It cannot be undone."),
                         pt!("Approve"),
                         pt!("Cancel")
                     ))
@@ -62,7 +62,7 @@ pub(crate) async fn send_leave_request(
                 SlackBlockButtonElement::new("reject_leave_request".into(), pt!("Reject"),)
                     .with_confirm(SlackBlockConfirmItem::new(
                         pt!("Really?"),
-                        pt!("This will mark the leave as reject. It cannot be undone."),
+                        pt!("This will mark this request for leave as rejected. It cannot be undone."),
                         pt!("Reject"),
                         pt!("Cancel")
                     ))
