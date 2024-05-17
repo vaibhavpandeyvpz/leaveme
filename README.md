@@ -67,4 +67,16 @@ To build the [Docker](https://www.docker.com/) container locally, use below comm
 
 ```shell
 docker build -t leaveme .
+# or 
+docker build -t ghcr.io/vaibhavpandeyvpz/leaveme .
+```
+
+Container once pushed, can be pulled and run directly as below:
+
+```shell
+docker run -it --rm \
+  -p "8000:8000" \
+  -v ./config.yml:/app_config.yml \
+  ghcr.io/vaibhavpandeyvpz/leaveme:latest \
+  leaveme --config=/app_config.yml
 ```
