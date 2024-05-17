@@ -4,6 +4,7 @@ use rocket::form::Form;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use url_encoded_data::UrlEncodedData;
 
 #[get("/")]
 pub(crate) fn index() -> &'static str {
@@ -28,12 +29,18 @@ pub(crate) async fn slack_interaction(interaction: Form<Interaction>) {
                 || action.action_id == "reject_leave_request"
             {
                 let value = action.value.as_ref().unwrap().as_str().unwrap();
-                let user_from_until = value.split("|").collect::<Vec<&str>>();
+                let decoded = UrlEncodedData::from(value);
+                let user = decoded.get_first("user").unwrap();
+                let from = decoded.get_first("from").unwrap();
+                let until = decoded.get_first("until").unwrap();
+                let reason = decoded.get_first("reason").unwrap();
+
                 update_leave_request(
                     &config::<String>("slack.channels.leaves"),
-                    &user_from_until[0].to_string(),
-                    &user_from_until[1].to_string(),
-                    &user_from_until[2].to_string(),
+                    &user.to_string(),
+                    &from.to_string(),
+                    &until.to_string(),
+                    &reason.to_string(),
                     &payload.user.id.to_string(),
                     action.action_id == "approve_leave_request",
                     &message.ts,

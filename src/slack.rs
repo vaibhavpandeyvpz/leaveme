@@ -1,6 +1,7 @@
 use crate::config;
 use crate::routes::InteractionStateValues;
 use slack_morphism::prelude::*;
+use url_encoded_data::UrlEncodedData;
 
 lazy_static::lazy_static! {
     static ref SLACK_CLIENT: SlackClient<SlackClientHyperHttpsConnector> =
@@ -47,9 +48,16 @@ pub(crate) async fn send_leave_request(
         true => reason.unwrap().into(),
         false => "No reason provided.".to_string(),
     };
+    let encoded = UrlEncodedData::parse_str("")
+        .set_one("user", user)
+        .set_one("from", from)
+        .set_one("until", until)
+        .set_one("reason", &reason_str)
+        .done()
+        .to_final_string();
     let blocks: Vec<SlackBlock> = slack_blocks![
         some_into(SlackSectionBlock::new().with_text(md!(format!(
-            "<@{}> has submitted a leave request from `{}` to `{}`.",
+            "<@{}> has submitted a request for leave from `{}` to `{}`.",
             user, from, until
         )))),
         some_into(SlackSectionBlock::new().with_text(md!(format!("*Reason:* {}", reason_str)))),
@@ -62,7 +70,7 @@ pub(crate) async fn send_leave_request(
                         pt!("Approve"),
                         pt!("Cancel")
                     ))
-                    .with_value(format!("{}|{}|{}", user, from, until).into())
+                    .with_value(encoded.clone())
                     .with_style("primary".into())
             ),
             some_into(
@@ -73,7 +81,7 @@ pub(crate) async fn send_leave_request(
                         pt!("Reject"),
                         pt!("Cancel")
                     ))
-                    .with_value(format!("{}|{}|{}", user, from, until).into())
+                    .with_value(encoded)
                     .with_style("danger".into())
             )
         ],))
@@ -212,7 +220,7 @@ pub(crate) async fn submit_leave_request(
         send_text_message(
             manager.into(),
             &format!(
-                "<@{}> has submitted a leave request. Please <{}|click here> to approve/reject.",
+                "<@{}> has submitted a request for leave. Please <{}|click here> to approve/reject.",
                 user, permalink
             )
             .to_string(),
@@ -236,6 +244,7 @@ pub(crate) async fn update_leave_request(
     user: &String,
     from: &String,
     until: &String,
+    reason: &String,
     manager: &String,
     approved: bool,
     ts: &String,
@@ -259,7 +268,7 @@ pub(crate) async fn update_leave_request(
     };
     send_text_message(
         channel,
-        &format!("<@{}> has *{}* this leave request.", manager, action).to_string(),
+        &format!("<@{}> has *{}* this request for leave.", manager, action).to_string(),
         Some(ts),
         None,
     )
@@ -267,8 +276,25 @@ pub(crate) async fn update_leave_request(
 
     // notify requester
     let message = format!(
-        "Your leave request from `{}` to `{}` has been *{}* :smile: by <@{}>.",
+        "Your request for leave from `{}` to `{}` has been *{}* :smile: by <@{}>.",
         from, until, action, manager
     );
     send_text_message(user, &message, None, None).await;
+
+    // remove actions
+    let update_chat_req = SlackApiChatUpdateRequest::new(
+        SlackChannelId::new(channel.into()),
+        SlackMessageContent::new().with_blocks(slack_blocks![
+            some_into(SlackSectionBlock::new().with_text(md!(format!(
+                "<@{}> has submitted a request for leave from `{}` to `{}`.",
+                user, from, until
+            )))),
+            some_into(SlackSectionBlock::new().with_text(md!(format!("*Reason:* {}", reason))))
+        ]),
+        SlackTs(ts.into()),
+    );
+    let _ = SLACK_CLIENT
+        .open_session(&SLACK_TOKEN)
+        .chat_update(&update_chat_req)
+        .await;
 }
