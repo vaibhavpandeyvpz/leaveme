@@ -1,5 +1,6 @@
 use crate::config;
 use crate::routes::InteractionStateValues;
+use chrono::prelude::*;
 use slack_morphism::prelude::*;
 use url_encoded_data::UrlEncodedData;
 
@@ -44,6 +45,15 @@ pub(crate) async fn send_leave_request(
     until: &String,
     reason: Option<&String>,
 ) -> String {
+    let from_dt = format!("{}T00:00:00Z", from)
+        .parse::<DateTime<Utc>>()
+        .unwrap();
+    let from_dt_str = from_dt.format("%a, %b %e %Y").to_string();
+    let until_dt = format!("{}T23:59:59Z", until)
+        .parse::<DateTime<Utc>>()
+        .unwrap();
+    let until_dt_str = until_dt.format("%a, %b %e %Y").to_string();
+
     let reason_str = match reason.is_some() {
         true => reason.unwrap().into(),
         false => "No reason provided.".to_string(),
@@ -57,10 +67,10 @@ pub(crate) async fn send_leave_request(
         .to_final_string();
     let blocks: Vec<SlackBlock> = slack_blocks![
         some_into(SlackSectionBlock::new().with_text(md!(format!(
-            "<@{}> has submitted a request for leave from `{}` to `{}`.",
-            user, from, until
+            "<@{}> has submitted a request for leave from *{}* to *{}*.",
+            user, from_dt_str, until_dt_str
         )))),
-        some_into(SlackSectionBlock::new().with_text(md!(format!("*Reason:* {}", reason_str)))),
+        some_into(SlackSectionBlock::new().with_text(md!(format!("*Reason:* _{}_", reason_str)))),
         some_into(SlackActionsBlock::new(slack_blocks![
             some_into(
                 SlackBlockButtonElement::new("approve_leave_request".into(), pt!("Approve"),)
@@ -98,6 +108,46 @@ pub(crate) async fn send_leave_request(
         .unwrap();
 
     post_chat_resp.ts.to_string()
+}
+
+pub(crate) async fn send_text_message(
+    channel: &String,
+    msg: &String,
+    ts: Option<&String>,
+    user: Option<&String>,
+) -> Option<String> {
+    return if user.is_some() {
+        let post_ephemeral_req = SlackApiChatPostEphemeralRequest::new(
+            channel.into(),
+            SlackUserId::new(user.unwrap().into()),
+            SlackMessageContent::new().with_text(msg.into()),
+        );
+
+        let _ = SLACK_CLIENT
+            .open_session(&SLACK_TOKEN)
+            .chat_post_ephemeral(&post_ephemeral_req)
+            .await;
+
+        None
+    } else {
+        let mut post_chat_req = SlackApiChatPostMessageRequest::new(
+            channel.into(),
+            SlackMessageContent::new().with_text(msg.into()),
+        )
+        .with_unfurl_links(false);
+
+        if let Some(thread_ts) = ts {
+            post_chat_req = post_chat_req.with_thread_ts(SlackTs::new(thread_ts.into()));
+        }
+
+        let post_chat_resp = SLACK_CLIENT
+            .open_session(&SLACK_TOKEN)
+            .chat_post_message(&post_chat_req)
+            .await
+            .unwrap();
+
+        Some(post_chat_resp.ts.to_string())
+    };
 }
 
 pub(crate) async fn show_leave_form_view(channel: &String, trigger_id: &String) {
@@ -147,46 +197,6 @@ pub(crate) async fn show_leave_form_view(channel: &String, trigger_id: &String) 
         .views_open(&leave_view_req)
         .await
         .unwrap();
-}
-
-pub(crate) async fn send_text_message(
-    channel: &String,
-    msg: &String,
-    ts: Option<&String>,
-    user: Option<&String>,
-) -> Option<String> {
-    return if user.is_some() {
-        let post_ephemeral_req = SlackApiChatPostEphemeralRequest::new(
-            channel.into(),
-            SlackUserId::new(user.unwrap().into()),
-            SlackMessageContent::new().with_text(msg.into()),
-        );
-
-        let _ = SLACK_CLIENT
-            .open_session(&SLACK_TOKEN)
-            .chat_post_ephemeral(&post_ephemeral_req)
-            .await;
-
-        None
-    } else {
-        let mut post_chat_req = SlackApiChatPostMessageRequest::new(
-            channel.into(),
-            SlackMessageContent::new().with_text(msg.into()),
-        )
-        .with_unfurl_links(false);
-
-        if let Some(thread_ts) = ts {
-            post_chat_req = post_chat_req.with_thread_ts(SlackTs::new(thread_ts.into()));
-        }
-
-        let post_chat_resp = SLACK_CLIENT
-            .open_session(&SLACK_TOKEN)
-            .chat_post_message(&post_chat_req)
-            .await
-            .unwrap();
-
-        Some(post_chat_resp.ts.to_string())
-    };
 }
 
 pub(crate) async fn submit_leave_request(
@@ -249,6 +259,16 @@ pub(crate) async fn update_leave_request(
     approved: bool,
     ts: &String,
 ) {
+    // format dates
+    let from_dt = format!("{}T00:00:00Z", from)
+        .parse::<DateTime<Utc>>()
+        .unwrap();
+    let from_dt_str = from_dt.format("%a, %b %e %Y").to_string();
+    let until_dt = format!("{}T23:59:59Z", until)
+        .parse::<DateTime<Utc>>()
+        .unwrap();
+    let until_dt_str = until_dt.format("%a, %b %e %Y").to_string();
+
     // add reaction
     add_reaction(
         channel,
@@ -276,8 +296,8 @@ pub(crate) async fn update_leave_request(
 
     // notify requester
     let message = format!(
-        "Your request for leave from `{}` to `{}` has been *{}* :smile: by <@{}>.",
-        from, until, action, manager
+        "Your request for leave from *{}* to *{}* has been *{}* by <@{}>.",
+        from_dt_str, until_dt_str, action, manager
     );
     send_text_message(user, &message, None, None).await;
 
@@ -286,10 +306,10 @@ pub(crate) async fn update_leave_request(
         SlackChannelId::new(channel.into()),
         SlackMessageContent::new().with_blocks(slack_blocks![
             some_into(SlackSectionBlock::new().with_text(md!(format!(
-                "<@{}> has submitted a request for leave from `{}` to `{}`.",
-                user, from, until
+                "<@{}> has submitted a request for leave from *{}* to *{}*.",
+                user, from_dt_str, until_dt_str
             )))),
-            some_into(SlackSectionBlock::new().with_text(md!(format!("*Reason:* {}", reason))))
+            some_into(SlackSectionBlock::new().with_text(md!(format!("*Reason:* _{}_", reason))))
         ]),
         SlackTs(ts.into()),
     );
