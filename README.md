@@ -1,5 +1,7 @@
 <h1 align="center">leaveme</h1>
 
+[![Screenshot](https://raw.githubusercontent.com/vaibhavpandeyvpz/leaveme/main/screenshot.png)](https://raw.githubusercontent.com/vaibhavpandeyvpz/leaveme/main/screenshot.png)
+
 <p align="center">
 Headless employee leave management in <a href="https://www.rust-lang.org/">Rust</a> built on <a href="https://slack.com/intl/en-in/">Slack</a> for small businesses.
 Record leave requests, require manager approval and leave(s) history etc. provided as Slack slash command(s).
