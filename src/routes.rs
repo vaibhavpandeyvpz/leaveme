@@ -15,7 +15,7 @@ pub(crate) fn index() -> &'static str {
 #[post("/slack/command", data = "<cmd>")]
 pub(crate) async fn slack_command(cmd: Form<SlashCommand>) {
     if cmd.command == "/leave-me" {
-        show_leave_form_view(cmd.channel_id.clone(), cmd.trigger_id.clone()).await;
+        show_leave_form_view(&cmd.channel_id, &cmd.trigger_id).await;
     }
 }
 
@@ -23,8 +23,8 @@ pub(crate) async fn slack_command(cmd: Form<SlashCommand>) {
 pub(crate) async fn slack_interaction(interaction: Form<Interaction>) {
     let payload: InteractionPayload = serde_json::from_str(&interaction.payload).unwrap();
     if payload.r#type == "block_actions" && payload.actions.is_some() {
-        let message = payload.message.as_ref().unwrap();
-        let actions = payload.actions.as_ref().unwrap();
+        let message = payload.message.unwrap();
+        let actions = payload.actions.unwrap();
         for action in actions.iter() {
             if action.action_id == "approve_leave_request"
                 || action.action_id == "reject_leave_request"
@@ -33,51 +33,53 @@ pub(crate) async fn slack_interaction(interaction: Form<Interaction>) {
                 let user_from_until = value.split("|").collect::<Vec<&str>>();
                 if action.action_id == "approve_leave_request" {
                     add_reaction(
-                        config::<String>("slack.channels.leaves").into(),
-                        message.ts.clone(),
-                        "white_check_mark".into(),
+                        &config::<String>("slack.channels.leaves"),
+                        &message.ts,
+                        &"white_check_mark".to_string(),
                     )
                     .await;
                     send_text_message(
-                        config::<String>("slack.channels.leaves").into(),
-                        format!("<@{}> has *approved* this leave request.", payload.user.id).into(),
-                        Some(message.ts.clone()),
+                        &config::<String>("slack.channels.leaves"),
+                        &format!("<@{}> has *approved* this leave request.", payload.user.id)
+                            .to_string(),
+                        Some(&message.ts),
                         None,
                     )
                     .await;
                     send_text_message(
-                        user_from_until[0].into(),
-                        format!(
+                        &user_from_until[0].to_string(),
+                        &format!(
                             "Your leave request from `{}` to `{}` has been approved :smile: by <@{}>.",
                             user_from_until[1],
                             user_from_until[2],
                             payload.user.id
-                        ).into(),
+                        ).to_string(),
                         None,
                         None
                     ).await;
                 } else if action.action_id == "reject_leave_request" {
                     add_reaction(
-                        config::<String>("slack.channels.leaves").into(),
-                        message.ts.clone(),
-                        "x".into(),
+                        &config::<String>("slack.channels.leaves"),
+                        &message.ts,
+                        &"x".to_string(),
                     )
                     .await;
                     send_text_message(
-                        config::<String>("slack.channels.leaves").into(),
-                        format!("<@{}> has *rejected* this leave request.", payload.user.id).into(),
-                        Some(message.ts.clone()),
+                        &config::<String>("slack.channels.leaves"),
+                        &format!("<@{}> has *rejected* this leave request.", payload.user.id)
+                            .to_string(),
+                        Some(&message.ts),
                         None,
                     )
                     .await;
                     send_text_message(
-                        user_from_until[0].into(),
-                        format!(
+                        &user_from_until[0].to_string(),
+                        &format!(
                             "Your leave request from `{}` to `{}` has been rejected :sob: by <@{}>.",
                             user_from_until[1],
                             user_from_until[2],
                             payload.user.id
-                        ).into(),
+                        ).to_string(),
                         None,
                         None
                     ).await;
@@ -95,39 +97,38 @@ pub(crate) async fn slack_interaction(interaction: Form<Interaction>) {
             let until =
                 &values["leave_request_until"]["leave_request_until_input"]["selected_date"];
             let reason = &values["leave_request_reason"]["leave_request_reason_input"]["value"];
-            let reason_as_str: Option<String>;
+            let reason_as_str: Option<&String>;
             if reason.is_some() {
-                reason_as_str = Some(reason.as_ref().unwrap().clone())
+                reason_as_str = Some(reason.as_ref().unwrap())
             } else {
                 reason_as_str = None
             }
 
             let ts = send_leave_request(
-                config::<String>("slack.channels.leaves").into(),
-                payload.user.id.clone(),
-                from.as_ref().unwrap().clone(),
-                until.as_ref().unwrap().clone(),
+                &config::<String>("slack.channels.leaves"),
+                &payload.user.id,
+                from.as_ref().unwrap(),
+                until.as_ref().unwrap(),
                 reason_as_str,
             )
             .await;
-            let permalink =
-                get_message_link(config::<String>("slack.channels.leaves").into(), ts).await;
+            let permalink = get_message_link(&config::<String>("slack.channels.leaves"), &ts).await;
             let managers = config::<Vec<String>>("managers");
 
             for manager in managers.iter() {
                 send_text_message(
                     manager.into(),
-                    format!("<@{}> has submitted a leave request. Please <{}|click here> to approve/reject.", payload.user.id, permalink).into(),
+                    &format!("<@{}> has submitted a leave request. Please <{}|click here> to approve/reject.", payload.user.id, permalink).to_string(),
                     None,
                     None,
                 ).await;
             }
 
             let _ = send_text_message(
-                view.private_metadata.as_ref().unwrap().clone(),
-                "Your request for leave has been submitted for approval.".into(),
+                &view.private_metadata.as_ref().clone().unwrap(),
+                &"Your request for leave has been submitted for approval.".to_string(),
                 None,
-                Some(payload.user.id.clone()),
+                Some(&payload.user.id),
             );
         }
     }

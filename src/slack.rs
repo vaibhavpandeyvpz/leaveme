@@ -1,28 +1,33 @@
 use crate::config;
 use slack_morphism::prelude::*;
 
-pub(crate) async fn add_reaction(channel: String, ts: String, reaction: String) {
-    let client = SlackClient::new(SlackClientHyperConnector::new().unwrap());
-    let token_value: SlackApiTokenValue = config::<String>("slack.bot_token").into();
-    let token: SlackApiToken = SlackApiToken::new(token_value);
-    let session = client.open_session(&token);
+lazy_static::lazy_static! {
+    static ref SLACK_CLIENT: SlackClient<SlackClientHyperHttpsConnector> =
+        SlackClient::new(SlackClientHyperHttpsConnector::new().unwrap());
+
+    static ref SLACK_TOKEN: SlackApiToken = SlackApiToken::new(
+        SlackApiTokenValue::new(config::<String>("slack.bot_token"))
+    );
+}
+
+pub(crate) async fn add_reaction(channel: &String, ts: &String, reaction: &String) {
     let reaction_add_req = SlackApiReactionsAddRequest::new(
-        SlackChannelId::new(channel),
-        SlackReactionName::new(reaction),
+        SlackChannelId::new(channel.into()),
+        SlackReactionName::new(reaction.into()),
         ts.into(),
     );
 
-    let _ = session.reactions_add(&reaction_add_req).await;
+    let _ = SLACK_CLIENT
+        .open_session(&SLACK_TOKEN)
+        .reactions_add(&reaction_add_req)
+        .await;
 }
 
-pub(crate) async fn get_message_link(channel: String, ts: String) -> String {
-    let client = SlackClient::new(SlackClientHyperConnector::new().unwrap());
-    let token_value: SlackApiTokenValue = config::<String>("slack.bot_token").into();
-    let token: SlackApiToken = SlackApiToken::new(token_value);
-    let session = client.open_session(&token);
+pub(crate) async fn get_message_link(channel: &String, ts: &String) -> String {
     let chat_permalink_req =
-        SlackApiChatGetPermalinkRequest::new(SlackChannelId::new(channel), ts.into());
-    let chat_permalink_resp = session
+        SlackApiChatGetPermalinkRequest::new(SlackChannelId::new(channel.into()), ts.into());
+    let chat_permalink_resp = SLACK_CLIENT
+        .open_session(&SLACK_TOKEN)
         .chat_get_permalink(&chat_permalink_req)
         .await
         .unwrap();
@@ -31,11 +36,11 @@ pub(crate) async fn get_message_link(channel: String, ts: String) -> String {
 }
 
 pub(crate) async fn send_leave_request(
-    channel: String,
-    user: String,
-    from: String,
-    until: String,
-    reason: Option<String>,
+    channel: &String,
+    user: &String,
+    from: &String,
+    until: &String,
+    reason: Option<&String>,
 ) -> String {
     let blocks: Vec<SlackBlock> = slack_blocks![
         some_into(SlackSectionBlock::new().with_text(md!(format!(
@@ -44,7 +49,7 @@ pub(crate) async fn send_leave_request(
         )))),
         some_into(SlackSectionBlock::new().with_text(md!(format!(
             "*Reason:* {}",
-            reason.or(Some("No reason provided.".to_string())).unwrap()
+            reason.or(Some(&"No reason provided.".to_string())).unwrap()
         )))),
         some_into(SlackActionsBlock::new(slack_blocks![
             some_into(
@@ -72,20 +77,20 @@ pub(crate) async fn send_leave_request(
         ],))
     ];
 
-    let client = SlackClient::new(SlackClientHyperConnector::new().unwrap());
-    let token_value: SlackApiTokenValue = config::<String>("slack.bot_token").into();
-    let token: SlackApiToken = SlackApiToken::new(token_value);
-    let session = client.open_session(&token);
     let post_chat_req = SlackApiChatPostMessageRequest::new(
-        SlackChannelId::new(channel),
+        SlackChannelId::new(channel.into()),
         SlackMessageContent::new().with_blocks(blocks),
     );
-    let post_chat_resp = session.chat_post_message(&post_chat_req).await.unwrap();
+    let post_chat_resp = SLACK_CLIENT
+        .open_session(&SLACK_TOKEN)
+        .chat_post_message(&post_chat_req)
+        .await
+        .unwrap();
 
     post_chat_resp.ts.to_string()
 }
 
-pub(crate) async fn show_leave_form_view(channel: String, trigger_id: String) {
+pub(crate) async fn show_leave_form_view(channel: &String, trigger_id: &String) {
     let blocks: Vec<SlackBlock> = slack_blocks![
         some_into(
             SlackSectionBlock::new()
@@ -117,55 +122,58 @@ pub(crate) async fn show_leave_form_view(channel: String, trigger_id: String) {
         )
     ];
 
-    let client = SlackClient::new(SlackClientHyperConnector::new().unwrap());
-    let token_value: SlackApiTokenValue = config::<String>("slack.bot_token").into();
-    let token: SlackApiToken = SlackApiToken::new(token_value);
-    let session = client.open_session(&token);
     let leave_view_req = SlackApiViewsOpenRequest::new(
         trigger_id.into(),
         SlackView::Modal(
             SlackModalView::new(pt!("Request a leave"), blocks)
                 .with_callback_id("submit_leave_request".into())
-                .with_private_metadata(channel)
+                .with_private_metadata(channel.into())
                 .with_submit(pt!("Submit")),
         ),
     );
 
-    session.views_open(&leave_view_req).await.unwrap();
+    SLACK_CLIENT
+        .open_session(&SLACK_TOKEN)
+        .views_open(&leave_view_req)
+        .await
+        .unwrap();
 }
 
 pub(crate) async fn send_text_message(
-    channel: String,
-    msg: String,
-    ts: Option<String>,
-    user: Option<String>,
+    channel: &String,
+    msg: &String,
+    ts: Option<&String>,
+    user: Option<&String>,
 ) -> Option<String> {
-    let client = SlackClient::new(SlackClientHyperConnector::new().unwrap());
-    let token_value: SlackApiTokenValue = config::<String>("slack.bot_token").into();
-    let token: SlackApiToken = SlackApiToken::new(token_value);
-    let session = client.open_session(&token);
     return if user.is_some() {
         let post_ephemeral_req = SlackApiChatPostEphemeralRequest::new(
             channel.into(),
-            user.as_ref().unwrap().into(),
-            SlackMessageContent::new().with_text(msg),
+            SlackUserId::new(user.unwrap().into()),
+            SlackMessageContent::new().with_text(msg.into()),
         );
 
-        let _ = session.chat_post_ephemeral(&post_ephemeral_req).await;
+        let _ = SLACK_CLIENT
+            .open_session(&SLACK_TOKEN)
+            .chat_post_ephemeral(&post_ephemeral_req)
+            .await;
 
         None
     } else {
         let mut post_chat_req = SlackApiChatPostMessageRequest::new(
             channel.into(),
-            SlackMessageContent::new().with_text(msg),
+            SlackMessageContent::new().with_text(msg.into()),
         )
         .with_unfurl_links(false);
 
         if let Some(thread_ts) = ts {
-            post_chat_req = post_chat_req.with_thread_ts(SlackTs::new(thread_ts));
+            post_chat_req = post_chat_req.with_thread_ts(SlackTs::new(thread_ts.into()));
         }
 
-        let post_chat_resp = session.chat_post_message(&post_chat_req).await.unwrap();
+        let post_chat_resp = SLACK_CLIENT
+            .open_session(&SLACK_TOKEN)
+            .chat_post_message(&post_chat_req)
+            .await
+            .unwrap();
 
         Some(post_chat_resp.ts.to_string())
     };
