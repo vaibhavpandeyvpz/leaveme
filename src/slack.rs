@@ -1,6 +1,7 @@
 use crate::config;
 use crate::routes::InteractionStateValues;
 use chrono::prelude::*;
+use slack_http_verifier::SlackVerifier;
 use slack_morphism::prelude::*;
 use url_encoded_data::UrlEncodedData;
 
@@ -317,4 +318,14 @@ pub(crate) async fn update_leave_request(
         .open_session(&SLACK_TOKEN)
         .chat_update(&update_chat_req)
         .await;
+}
+
+pub(crate) async fn verify_request(
+    body: &String,
+    secret: &String,
+    timestamp: &String,
+    signature: &String,
+) {
+    let verifier = SlackVerifier::new(secret.as_str()).unwrap();
+    verifier.verify(timestamp, body, signature).unwrap();
 }

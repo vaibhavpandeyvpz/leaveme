@@ -1,6 +1,7 @@
-FROM rust:1-alpine
+FROM rust:1
 
-RUN apk add --no-cache musl-dev
+RUN apt update -y && \
+    apt install pkg-config
 
 RUN cd / && cargo new dummy
 
