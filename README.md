@@ -7,6 +7,12 @@ Headless employee leave management in <a href="https://www.rust-lang.org/">Rust<
 Record leave requests, require manager approval and leave(s) history etc. provided as Slack slash command(s).
 </p>
 
+<p align="center">
+<img alt="Build status" src="https://github.com/vaibhavpandeyvpz/leaveme/workflows/Release/badge.svg">
+<img alt="GitHub Release" src="https://img.shields.io/github/v/release/vaibhavpandeyvpz/leaveme">
+<img alt="GitHub Downloads (all assets, all releases)" src="https://img.shields.io/github/downloads/vaibhavpandeyvpz/leaveme/total">
+</p>
+
 ## Usage
 
 Grab a binary from the latest release for your platform from [this page](https://github.com/vaibhavpandeyvpz/leaveme/releases/latest).
