@@ -20,10 +20,15 @@ jobs:
       version: ${{ steps.release.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+      - name: Collect changelog
+        id: changelog
+        uses: saadmk11/changelog-ci@v1
       - name: Create a Github release
         uses: taiki-e/create-gh-release-action@v1
         id: release
         with:
+          allow-missing-changelog: true
+          changelog: "${{ steps.changelog.outputs.changelog }}"
           token: ${{ secrets.GITHUB_TOKEN }}
 
   release:
