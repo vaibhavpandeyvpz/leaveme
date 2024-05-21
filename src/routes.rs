@@ -29,7 +29,7 @@ pub(crate) async fn slack_command(
     //     &signature.0.to_string(),
     // ).await;
 
-    return if cmd.command == "/leave-me" {
+    return if cmd.command == config::<String>("slack.commands.leave_request") {
         show_leave_form_view(&cmd.channel_id, &cmd.trigger_id).await;
 
         Status::Ok

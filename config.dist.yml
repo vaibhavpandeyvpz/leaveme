@@ -6,4 +6,6 @@ slack:
   bot_token:
   channels:
     leaves:
+  commands:
+    leave_request: /leave-me
   signing_secret:
