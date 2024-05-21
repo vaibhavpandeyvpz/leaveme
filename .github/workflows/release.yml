@@ -20,9 +20,15 @@ jobs:
       version: ${{ steps.release.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+      - name: Get tag or version
+        id: gitvars
+        run: |
+          echo ::set-output name=version::${GITHUB_REF#refs/tags/}
       - name: Collect changelog
         id: changelog
         uses: saadmk11/changelog-ci@v1.1.2
+        with:
+          release_version: ${{ steps.gitvars.outputs.version }}
       - name: Create a Github release
         uses: taiki-e/create-gh-release-action@v1
         id: release
