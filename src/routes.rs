@@ -52,7 +52,7 @@ pub(crate) async fn slack_interaction(
     //     &signature.0.to_string(),
     // ).await;
 
-    let payload: InteractionPayload = serde_json::from_str(&interaction.payload).unwrap();
+    let payload = serde_json::from_str::<InteractionPayload>(&interaction.payload).unwrap();
     if payload.r#type == "block_actions" && payload.actions.is_some() {
         let message = payload.message.unwrap();
         let actions = payload.actions.unwrap();
@@ -65,6 +65,7 @@ pub(crate) async fn slack_interaction(
                 let user = decoded.get_first("user").unwrap();
                 let from = decoded.get_first("from").unwrap();
                 let until = decoded.get_first("until").unwrap();
+                let full_or_half = decoded.get_first("full_or_half").unwrap();
                 let reason = decoded.get_first("reason").unwrap();
 
                 update_leave_request(
@@ -72,6 +73,7 @@ pub(crate) async fn slack_interaction(
                     &user.to_string(),
                     &from.to_string(),
                     &until.to_string(),
+                    &full_or_half.to_string(),
                     &reason.to_string(),
                     &payload.user.id.to_string(),
                     action.action_id == "approve_leave_request",
@@ -85,12 +87,11 @@ pub(crate) async fn slack_interaction(
     } else if payload.r#type == "view_submission" && payload.view.is_some() {
         let view = payload.view.as_ref().unwrap();
         if view.callback_id == "submit_leave_request" {
-            let values = &view.state.values;
             submit_leave_request(
                 view.private_metadata.as_ref().clone().unwrap(),
                 &config::<String>("slack.channels.leaves"),
                 &payload.user.id,
-                &values,
+                &view.state.values,
             )
             .await;
 
@@ -138,8 +139,7 @@ pub(crate) struct InteractionState {
     values: InteractionStateValues,
 }
 
-pub(crate) type InteractionStateValues =
-    HashMap<String, HashMap<String, HashMap<String, Option<String>>>>;
+pub(crate) type InteractionStateValues = HashMap<String, HashMap<String, HashMap<String, Value>>>;
 
 #[derive(Deserialize)]
 pub(crate) struct InteractionUser {

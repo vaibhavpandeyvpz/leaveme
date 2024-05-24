@@ -1,6 +1,8 @@
 use crate::config;
 use crate::routes::InteractionStateValues;
 use chrono::prelude::*;
+use clap::builder::Str;
+use config::Map;
 use slack_http_verifier::SlackVerifier;
 use slack_morphism::prelude::*;
 use url_encoded_data::UrlEncodedData;
@@ -44,6 +46,7 @@ pub(crate) async fn send_leave_request(
     user: &String,
     from: &String,
     until: &String,
+    full_or_half: &String,
     reason: Option<&String>,
 ) -> String {
     let from_dt = format!("{}T00:00:00Z", from)
@@ -55,14 +58,19 @@ pub(crate) async fn send_leave_request(
         .unwrap();
     let until_dt_str = until_dt.format("%a, %b %e %Y").to_string();
 
+    let full_or_half_str = match full_or_half.as_str() {
+        "half" => "Half day".to_string(),
+        _ => "Full day".to_string(),
+    };
     let reason_str = match reason.is_some() {
         true => reason.unwrap().into(),
         false => "No reason provided.".to_string(),
     };
     let encoded = UrlEncodedData::parse_str("")
         .set_one("user", user)
-        .set_one("from", from)
-        .set_one("until", until)
+        .set_one("from", &from_dt_str)
+        .set_one("until", &until_dt_str)
+        .set_one("full_or_half", &full_or_half_str)
         .set_one("reason", &reason_str)
         .done()
         .to_final_string();
@@ -71,6 +79,7 @@ pub(crate) async fn send_leave_request(
             "<@{}> has submitted a request for leave from *{}* to *{}*.",
             user, from_dt_str, until_dt_str
         )))),
+        some_into(SlackSectionBlock::new().with_text(md!(format!("*Full or half day:* {}", full_or_half_str)))),
         some_into(SlackSectionBlock::new().with_text(md!(format!("*Reason:* _{}_", reason_str)))),
         some_into(SlackActionsBlock::new(slack_blocks![
             some_into(
@@ -155,21 +164,38 @@ pub(crate) async fn show_leave_form_view(channel: &String, trigger_id: &String) 
     let blocks: Vec<SlackBlock> = slack_blocks![
         some_into(
             SlackSectionBlock::new()
-                .with_text(pt!("Fill and submit below information to request a leave."))
+                .with_text(pt!("Fill and submit below information to request a leave. Please be noted, the dates are inclusive."))
         ),
         some_into(
             SlackInputBlock::new(
-                pt!("From"),
+                pt!("From date"),
                 SlackBlockDatePickerElement::new("leave_request_from_input".into()).into()
             )
             .with_block_id("leave_request_from".into())
         ),
         some_into(
             SlackInputBlock::new(
-                pt!("Until"),
+                pt!("Last date"),
                 SlackBlockDatePickerElement::new("leave_request_until_input".into()).into()
             )
             .with_block_id("leave_request_until".into())
+        ),
+        some_into(
+            SlackInputBlock::new(
+                pt!("Full or half-day"),
+                SlackBlockRadioButtonsElement::new(
+                    "leave_request_full_half_input".into(),
+                    vec![
+                        SlackBlockChoiceItem::new(pt!("Full day(s)"), "full".into()),
+                        SlackBlockChoiceItem::new(pt!("Half day"), "half".into())
+                    ]
+                )
+                .with_initial_option(
+                    SlackBlockChoiceItem::new(pt!("Full day(s)"), "full".into()),
+                )
+                .into()
+            )
+            .with_block_id("leave_request_full_half".into())
         ),
         some_into(
             SlackInputBlock::new(
@@ -208,19 +234,27 @@ pub(crate) async fn submit_leave_request(
 ) {
     let from = &values["leave_request_from"]["leave_request_from_input"]["selected_date"];
     let until = &values["leave_request_until"]["leave_request_until_input"]["selected_date"];
+    let full_or_half =
+        &values["leave_request_full_half"]["leave_request_full_half_input"]["selected_option"];
     let reason = &values["leave_request_reason"]["leave_request_reason_input"]["value"];
-    let reason_as_str = match reason.is_some() {
-        true => Some(reason.as_ref().unwrap()),
-        false => None,
+    let reason_str: String = match reason.is_null() {
+        true => "".into(),
+        false => reason.as_str().unwrap().into(),
     };
+    let full_or_half_object = full_or_half.as_object().unwrap();
+    let full_or_half_str = &full_or_half_object["value"];
 
     // send leave request
     let ts = send_leave_request(
         to_channel,
         user,
-        from.as_ref().unwrap(),
-        until.as_ref().unwrap(),
-        reason_as_str,
+        &from.as_str().unwrap().into(),
+        &until.as_str().unwrap().into(),
+        &full_or_half_str.as_str().unwrap().into(),
+        match reason_str.len() > 0 {
+            true => Some(&reason_str),
+            false => None,
+        },
     )
     .await;
 
@@ -255,21 +289,12 @@ pub(crate) async fn update_leave_request(
     user: &String,
     from: &String,
     until: &String,
+    full_or_half: &String,
     reason: &String,
     manager: &String,
     approved: bool,
     ts: &String,
 ) {
-    // format dates
-    let from_dt = format!("{}T00:00:00Z", from)
-        .parse::<DateTime<Utc>>()
-        .unwrap();
-    let from_dt_str = from_dt.format("%a, %b %e %Y").to_string();
-    let until_dt = format!("{}T23:59:59Z", until)
-        .parse::<DateTime<Utc>>()
-        .unwrap();
-    let until_dt_str = until_dt.format("%a, %b %e %Y").to_string();
-
     // add reaction
     add_reaction(
         channel,
@@ -298,7 +323,7 @@ pub(crate) async fn update_leave_request(
     // notify requester
     let message = format!(
         "Your request for leave from *{}* to *{}* has been *{}* by <@{}>.",
-        from_dt_str, until_dt_str, action, manager
+        from, until, action, manager
     );
     send_text_message(user, &message, None, None).await;
 
@@ -308,8 +333,12 @@ pub(crate) async fn update_leave_request(
         SlackMessageContent::new().with_blocks(slack_blocks![
             some_into(SlackSectionBlock::new().with_text(md!(format!(
                 "<@{}> has submitted a request for leave from *{}* to *{}*.",
-                user, from_dt_str, until_dt_str
+                user, from, until
             )))),
+            some_into(
+                SlackSectionBlock::new()
+                    .with_text(md!(format!("*Full or half day:* {}", full_or_half)))
+            ),
             some_into(SlackSectionBlock::new().with_text(md!(format!("*Reason:* _{}_", reason))))
         ]),
         SlackTs(ts.into()),
